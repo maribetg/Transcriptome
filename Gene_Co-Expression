@@ -1,0 +1,48 @@
+#Gene co-expression analysis
+library(WGCNA)
+options(stringsAsFactors = FALSE)
+WGCNAexpression = read.csv("WGCNA-expression.csv") #file of expression data
+WGCNAexpression01 = WGCNAexpression #copy counts in a file
+WGCNAexpression01$Name <- NULL #remove first column of names
+rownames(WGCNAexpression01) <- WGCNAexpression[,1]
+WGCNAdata = read.csv("WGCNA-data.csv") #file of sites
+WGCNAdata01 = WGCNAdata #copy counts in a file
+WGCNAdata01$Name <- NULL #remove first column of names
+rownames(WGCNAdata01) <- WGCNAdata[,1]
+save(WGCNAexpression01, WGCNAdata01, file = "WGCNA-input.RData") #save the files for the program
+WGCNA = load(file = "WGCNA-input.RData") #load the file to R environment
+powers = c(c(1:10), seq(from= 12, to=20, by=2)) #power analysis
+sft = pickSoftThreshold(WGCNAexpression01, powerVector = powers, verbose = 5, networkType = "signed") #network topology function
+# Plot the results:
+sizeGrWindow(9, 5)
+par(mfrow = c(1,2)); cex1 = 0.9; plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2], xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n", main = paste("Scale independence")); text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2], labels=powers,cex=cex1,col="red"); abline(h=0.90,col="red")
+# Mean connectivity as a function of the soft-thresholding. We found power 10
+plot(sft$fitIndices[,1], sft$fitIndices[,5], xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n", main = paste("Mean connectivity"))
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+#Network construction
+net = blockwiseModules(WGCNAexpression01, power = 10, TOMType = "signed", minModuleSize = 10, reassignThreshold = 0, mergeCutHeight = 0.015, numericLabels = TRUE, pamRespectsDendro = FALSE, saveTOMs = TRUE, saveTOMFileBase = "WGCNATOM", verbose = 3)
+#Label the network
+mergedColors = labels2colors(net$colors)
+#plot
+plotDendroAndColors(net$dendrograms[[1]], mergedColors[net$blockGenes[[1]]], "Module colors", dendroLabels = FALSE, hang = 0.03, addGuide = TRUE, guideHang = 0.05)
+#Save
+moduleLabels = net$colors
+moduleColors = labels2colors(net$colors)
+MEs = net$MEs; geneTree = net$dendrograms[[1]]; save(MEs, moduleLabels, moduleColors, geneTree,file = "WGCNA-networkConstruction.RData")
+#Load data
+lnames = load(file = "WGCNA-input.RData")
+lnames = load(file = "WGCNA-networkConstruction.RData")
+#Define number of genes and samples
+nGenes = ncol(WGCNAexpression01)
+nSamples = nrow(WGCNAexpression01)
+#Recalculate MEs with color labels
+MEs0 = moduleEigengenes(WGCNAexpression01, moduleColors)$eigengenes
+MEs = orderMEs(MEs0)
+moduleTraitCor = cor(MEs, WGCNAdata01, use = "all.obs")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
+sizeGrWindow(10,6)
+#Display correlations and p-values
+textMatrix = paste(signif(moduleTraitCor, 2), "\n(", signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+par(mar = c(6, 8.5, 3, 3))
+labeledHeatmap(Matrix = moduleTraitCor, xLabels = names(WGCNAdata01), yLabels = names(MEs), ySymbols = names(MEs),colorLabels = FALSE, colors = blueWhiteRed(50), textMatrix = textMatrix, setStdMargins = FALSE, cex.text = 0.5, zlim = c(-1,1), colorMatrix = NULL)
