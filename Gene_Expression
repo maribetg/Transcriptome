@@ -1,0 +1,263 @@
+#Gene expression differences among species at each sampling site
+library(edgeR)
+library(limma)
+library(ggplots2)
+library(RColorBrewer)
+library(dplyr)
+library(forcats)
+library(hrbrthemes)
+library(viridis)
+library(gplots)
+
+## al data
+seqdata <- read.delim("all.txt", stringsAsFactors = FALSE) #Import the file of counts
+seqdata[is.nan(seqdata)]=0 #change na to zero
+info <- read.delim("info.txt") #import file of information
+datannames = seqdata #copy counts in a file
+datannames$name <- NULL #remove first column of names
+rownames(datannames) <- seqdata[,1] #identify the names of the genes at the table
+abs(datannames) #retain aboslute numbers and remove negative values
+cpm <- cpm(datannames) #filter low expressed reads
+Norm <- calcNormFactors (datannames, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+dege <- DGEList(datannames) #create DGE object for downstream analysis
+norm_dege <- calcNormFactors(dege, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+log <- cpm(dege, log=TRUE) #obtained the log transformed data
+var_genes <- apply(log, 1, var) #variance of each row (genes)
+mypalette <- brewer.pal(11,"RdYlBu") #colours for heatmap
+morecols <- colorRampPalette(mypalette) #colours assembly for heatmap
+col.loc <- c("purple", "orange", "green", "blue")[info$Locality] #colours for locality
+col.genes <- c("purple", "orange", "green", "blue")[info$Name] #colours for genes
+heatmap(log, col=rev(morecols(50)), trace="none", ColSideColors = col.loc, scale = "row") #heatmap
+
+#correlacion with environmental factors to all data
+library(limma)
+d0 <- calcNormFactors(dege)
+dim(d0)
+env <-read.delim("info.txt", stringsAsFactors = FALSE) #Import the file of environmental data
+
+
+#In this case, limma is fitting a linear regression model, which here is a straight line fit, with the slope and intercept defined by the model coefficients:
+DN413 <- y$E["DN413",]
+plot(DN413 ~ info$Precipitacion, ylim = c(0, 3.5))
+intercept <- coef(fit)["DN413", "(Intercept)"]
+slope <- coef(fit)["DN413", "precipitation"]
+abline(a = intercept, b = slope)
+
+DN227 <- y$E["DN227",]
+plot(DN227 ~ info$Precipitacion, ylim = c(0, 3.5))
+intercept <- coef(fit)["DN413", "(Intercept)"]
+
+
+#Watertemp
+mm_WT <- model.matrix(~info$Watertemp) #each environmental factors
+y_WT <- voom(d0, mm_WT, plot = F) #calculation of variance weights with environmental
+fit_WT <- lmFit(y_WT, mm_WT) #linear fit models in limma
+tmp_WT <- contrasts.fit(fit_WT, coef = 2) # test coefficient
+tmp_WT <- eBayes(tmp_WT)
+top.table_WT <- topTable(tmp_WT, sort.by = "P", n = Inf)
+head(top.table_WT, 20)
+length(which(top.table_WT$adj.P.Val < 0.05))
+
+DN139_01_WT <- y_WT$E["DN139-01",]
+plot(DN139_01_WT ~ info$Watertemp, ylim = c(0, 3.5))
+
+DN232_WT <- y_WT$E["DN232",]
+plot(DN232_WT ~ info$Watertemp, ylim = c(0, 3.5))
+
+DN63_WT <- y_WT$E["DN63",]
+plot(DN63_WT ~ info$Watertemp, ylim = c(0, 3.5))
+
+DN65_WT <- y_WT$E["DN65",]
+plot(DN65_WT ~ info$Watertemp, ylim = c(0, 3.5))
+
+DN138_WT <- y_WT$E["DN138",]
+plot(DN138_WT ~ info$Watertemp, ylim = c(0, 3.5))
+
+#Airtemp
+mm_AT <- model.matrix(~info$Airtemp) #each environmental factors
+y_AT <- voom(d0, mm_AT, plot = F) #calculation of variance weights with environmental
+fit_AT <- lmFit(y_AT, mm_AT) #linear fit models in limma
+tmp_AT <- contrasts.fit(fit_AT, coef = 2) # test coefficient
+tmp_AT <- eBayes(tmp_AT)
+top.table_AT <- topTable(tmp_AT, sort.by = "P", n = Inf)
+head(top.table_AT, 20)
+length(which(top.table_AT$adj.P.Val < 0.05))
+
+DN311_AT <- y_AT$E["DN311",]
+plot(DN311_AT ~ info$Airtemp, ylim = c(0, 3.5))
+
+DN57_AT <- y_AT$E["DN57",]
+plot(DN57_AT ~ info$Airtemp, ylim = c(0, 3.5))
+
+DN396_AT <- y_AT$E["DN396",]
+plot(DN396_AT ~ info$Airtemp, ylim = c(0, 3.5))
+
+DN173_AT <- y_AT$E["DN173",]
+plot(DN173_AT ~ info$Airtemp, ylim = c(0, 3.5))
+
+## selected 14 genes
+genes14 <- read.delim("genes14.txt", stringsAsFactors = FALSE) #Import the file of 14 genes selected
+datagenes14 = genes14 #copy counts in a file
+datagenes14$name <- NULL #remove first column of names
+rownames(datagenes14) <- genes14[,1] #identify the names of the genes at the table
+degegenes14 <- DGEList(datagenes14) #create DGE object for downstream analysis
+normgenes14 <- calcNormFactors (degegenes14, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+loggenes14 <- cpm(normgenes14, log=TRUE) #obtained the log transformed data
+heatmap.2(loggenes14, trace= "none", col=rev(morecols(50)), ColSideColors = col.loc, scale = "column") #heatmap
+data= data.frame(loggnes14) #convert the file in table
+data = as.data.frame(t(data)) #change column for row and vice
+write.table(data, "log-genes14.txt") #write the output in a table
+dataloggnes14 <- read.delim("loggenes14-trans.txt", stringsAsFactors = FALSE) #transform data of log for the 14 genes
+dataloggnes14 %>% mutate(Gene = fct_reorder(Gene, Log)) %>% mutate(Gene = factor(Gene, levels= c(dataloggnes14$Gene))) %>% ggplot(aes(fill=Site, y=Log, x=Gene)) + geom_violin(position="dodge", alpha=0.5, outlier.colour="transparent") + scale_fill_viridis(discrete=T, name="")+ theme_ipsum()+ xlab("") + ylab("Log2") + ylim(0,40)
+loggenes14.t <- t(loggenes14) #change row for columns
+dist.genes14 = vegdist(loggenes14.t, method = "bray") #pairwise comparison
+genes14.pco <- cmdscale(dist.genes14, eig= TRUE) #pco
+plot(genes14.pco$points, asp=1, xlab="PCO1", ylab="PCO2")
+text(genes14.pco$points, labels = rownames(genes14.pco$points))
+
+##Selected 22 genes PCO
+genes22 <- read.csv("22genes.csv", row.names=1, header=TRUE)
+dist.genes22 = vegdist(genes22, method = "bray") #pairwise comparison
+genes22.pco <- cmdscale(dist.genes22, eig= TRUE) #pco
+plot(genes22.pco$points, asp=1, xlab="PC1(33.1%)", ylab="PC2(26.5%)", pch = 16)
+text(genes22.pco$points, labels = rownames(genes22.pco$points)) #add the name to the plot instead of points
+genes17 <- read.delim("genes17.txt", stringsAsFactors = FALSE) #import the file of 17 functional genes
+datagenes17 = genes17 #copy counts in a file
+datagenes17$Name <- NULL #remove first column of names
+rownames(datagenes17) <- genes17[,1] #identify the names of the genes at the table
+degegenes17 <- DGEList(datagenes17) #create DGE object for downstream analysis
+normgenes17 <- calcNormFactors (degegenes17, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+loggenes17 <- cpm(normgenes17, log=TRUE) #obtained the log transformed data
+col.genes.genes17 <- c("red", "blue", "green", "purple")[genes17$Name] #colours for locality
+heatmap.2(loggenes17, trace="none", col=rev(morecols(50)), ColSideColors = col.genes.genes17, scale = "row", Colv = FALSE, dendrogram = "row") #heatmap
+
+
+
+###per species
+##Haploperla
+haploperla <- read.delim("haploperla.txt", stringsAsFactors = FALSE) #import the file 
+datahaplo = haploperla #copy counts in a file
+datahaplo$Name <- NULL #remove first column of names
+rownames(datahaplo) <- haploperla[,1] #identify the names of the genes at the table
+degehaplo <- DGEList(datahaplo) #create DGE object for downstream analysis
+normhaplo <- calcNormFactors (degehaplo, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+loghaplo <- cpm(normhaplo, log=TRUE) #obtained the log transformed data
+col.genes.haplo <- c("purple", "orange", "green", "blue")[haploperla$Name] #colours for locality
+heatmap.2(loghaplo, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap keeping the column order position and ordering based on rows
+
+##Nemoura
+nemoura <- read.delim("nemoura.txt", stringsAsFactors = FALSE) #import the file 
+datanemo = nemoura #copy counts in a file
+datanemo$Name <- NULL #remove first column of names
+rownames(datanemo) <- nemoura[,1] #identify the names of the genes at the table
+degenemo <- DGEList(datanemo) #create DGE object for downstream analysis
+normnemo <- calcNormFactors (degenemo, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+lognemo <- cpm(normnemo, log=TRUE) #obtained the log transformed data
+heatmap.2(lognemo, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap keeping the column order position and ordering based on rows
+
+##Stavsolus
+stavsolus <- read.delim("stavsolus.txt", stringsAsFactors = FALSE) #import the file 
+datastav = stavsolus #copy counts in a file
+datastav$Name <- NULL #remove first column of names
+rownames(datastav) <- stavsolus[,1] #identify the names of the genes at the table
+degestav <- DGEList(datastav) #create DGE object for downstream analysis
+norstav <- calcNormFactors (degestav, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+logstav <- cpm(norstav, log=TRUE) #obtained the log transformed data
+heatmap.2(logstav, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap keeping the column order position and ordering based on rows
+
+##Rhabiopteryx
+rhabiopteryx <- read.delim("rhabiopteryx.txt", stringsAsFactors = FALSE) #import the file 
+datarhab = rhabiopteryx #copy counts in a file
+datarhab$Name <- NULL #remove first column of names
+rownames(datarhab) <- rhabiopteryx[,1] #identify the names of the genes at the table
+degerhab <- DGEList(datarhab) #create DGE object for downstream analysis
+normrhab <- calcNormFactors (degerhab, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+logrhab <- cpm(normrhab, log=TRUE) #obtained the log transformed data
+heatmap.2(logrhab, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap keeping the column order position and ordering based on rows
+
+##Amphinemoura
+amphinemoura <- read.delim("amphinemoura.txt", stringsAsFactors = FALSE) #import the file 
+dataamph = amphinemoura #copy counts in a file
+dataamph$Name <- NULL #remove first column of names
+rownames(dataamph) <- amphinemoura[,1] #identify the names of the genes at the table
+degeamph <- DGEList(dataamph) #create DGE object for downstream analysis
+normamph <- calcNormFactors (degeamph, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+logamph <- cpm(normamph, log=TRUE) #obtained the log transformed data
+heatmap.2(logamph, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap keeping the column order position and ordering based on rows
+
+##perlodini
+perlodini <- read.delim("perlodini.txt", stringsAsFactors = FALSE) #import the file 
+dataperlo = perlodini #copy counts in a file
+dataperlo$Name <- NULL #remove first column of names
+rownames(dataperlo) <- perlodini[,1] #identify the names of the genes at the table
+degeperlo <- DGEList(dataperlo) #create DGE object for downstream analysis
+normperlo <- calcNormFactors (degeperlo, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+logperlo <- cpm(normperlo, log=TRUE) #obtained the log transformed data
+heatmap.2(logperlo, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap keeping the column order position and ordering based on rows
+
+##Eucanopsis
+eucanopsis <- read.delim("eucanopsis.txt", stringsAsFactors = FALSE) #import the file 
+dataeucan = eucanopsis #copy counts in a file
+dataeucan$Name <- NULL #remove first column of names
+rownames(dataeucan) <- eucanopsis[,1] #identify the names of the genes at the table
+degeeucan <- DGEList(dataeucan) #create DGE object for downstream analysis
+normeucan <- calcNormFactors (degeeucan, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+logeucan <- cpm(normeucan, log=TRUE) #obtained the log transformed data
+heatmap.2(logeucan, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap keeping the column order position and ordering based on rows
+
+###Data salmon-per locality
+##Matsuyama
+mat01 <- read.delim("matsuyama01.txt", stringsAsFactors = FALSE) #import the file of all species from matsuyama
+datamat01 = mat01 #copy counts in a file
+datamat01$Name <- NULL #remove first column of names
+rownames(datamat01) <- mat01[,1] #identify the names of the genes at the table
+degemat01 <- DGEList(datamat01) #create DGE object for downstream analysis
+normmat01 <- calcNormFactors (degemat01, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+logmat01 <- cpm(normmat01, log=TRUE) #obtained the log transformed data
+heatmap.2(logmat01, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap
+
+##Gifu
+gifu01 <- read.delim("gifu01.txt", stringsAsFactors = FALSE) #import the file of all species from matsuyama
+datagifu01 = gifu01 #copy counts in a file
+datagifu01$Name <- NULL #remove first column of names
+rownames(datagifu01) <- gifu01[,1] #identify the names of the genes at the table
+degegifu01 <- DGEList(datagifu01) #create DGE object for downstream analysis
+normgifu01 <- calcNormFactors (degegifu01, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+loggifu01 <- cpm(normgifu01, log=TRUE) #obtained the log transformed data
+heatmap.2(loggifu01, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap
+
+##Sendai
+send01 <- read.delim("sendai01.txt", stringsAsFactors = FALSE) #import the file of all species from matsuyama
+datasend01 = send01 #copy counts in a file
+datasend01$Name <- NULL #remove first column of names
+rownames(datasend01) <- send01[,1] #identify the names of the genes at the table
+degesend01 <- DGEList(datasend01) #create DGE object for downstream analysis
+normsend01 <- calcNormFactors (degesend01, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+logsend01 <- cpm(normsend01, log=TRUE) #obtained the log transformed data
+heatmap.2(logsend01, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap
+
+##Sapporo
+sapp01 <- read.delim("sapporo01.txt", stringsAsFactors = FALSE) #import the file of all species from matsuyama
+datasapp01 = sapp01 #copy counts in a file
+datasapp01$Name <- NULL #remove first column of names
+rownames(datasapp01) <- sapp01[,1] #identify the names of the genes at the table
+degesapp01 <- DGEList(datasapp01) #create DGE object for downstream analysis
+normsapp01 <- calcNormFactors (degesapp01, method = c("TMM"), refcolumn =TRUE) #Normalization methods to scale the raw library sizes
+logsapp01 <- cpm(normsapp01, log=TRUE) #obtained the log transformed data
+heatmap.2(logsapp01, trace="none", col=rev(morecols(50)), scale = "row", Colv = FALSE, dendrogram = "row") #heatmap
+
+#Gene expression diversity
+library(vegan)
+library(codyn)
+diversity(logsapp, MARGIN = 2, index = "simpson") #Calculate the alpha diversity of the sample. Margin rotate the table to species
+diversity(logmat, MARGIN = 2, index = "simpson")
+diversity(loggifu, MARGIN = 2, index = "simpson")
+diversity(logsend, MARGIN = 2, index = "simpson")
+diversity(logsapp, MARGIN = 2, index = "invsimpson") #Calculate the alpha diversity of the sample using invsimpson, all genes were equaly abundant. Margin rotate the table to species
+diversity(logmat, MARGIN = 2, index = "invsimpson")
+diversity(loggifu, MARGIN = 2, index = "invsimpson")
+diversity(logsend, MARGIN = 2, index = "invsimpson")
+
+logsappcodyn = read.csv("logsapp.csv")
+codynturnover <- turnover(df = logsappcodyn, species.var = "species", time.var = "year", abundance.var = "abundance") #Calculate total turnover
+codynturnover <- turnover(df = logsappcodyn, species.var = "species", time.var = "year", abundance.var = "abundance", metric = "appearance") #Calculate appearance
