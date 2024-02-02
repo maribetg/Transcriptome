@@ -1,0 +1,13 @@
+#De novo assembly
+./Trinity  --seqType fq --max_memory 50G --left FRNA0029_1.fq,FRNA0030_1.fq --right FRNA0029_2.fq,FRNA0030_2.fq --CPU 6 --SS_lib_type FR --min_contig_length 50 --no_cleanup --group_pairs_distance 100 --KMER_SIZE 21 --output trinitygif1
+#count the number of transcripts
+grep '>' trinity_sap/Trinity.fasta | wc -l
+#statistical fo the output
+perl ./trinityrnaseq-Trinity-v2.8.2/util/TrinityStats.pl TRINITY\ PERSITE\ PER\ SPECIES/Trinity_Gifu\ each\ species/trinitygif1/Trinity.fasta
+#create an additional file
+cp Trinity.fasta transcriptome.fa
+#Creating the tx2gene file for each specie per site
+Gifu sp1
+perl ./trinityrnaseq-Trinity-v2.8.2/util/support_scripts/get_Trinity_gene_to_trans_map.pl TRINITY\ PERSITE\ PER\ SPECIES/Trinity_Gifu\ each\ species/trinitygif1/gsp1.fa > gene2tx.tsv
+awk 'BEGIN{print "TXNAME,GENEID"} ' > tx2gene.csv
+awk -F $'\t' ' { t =$1; $1 = $S2; $S2 = t; print; } ' OFS=$',' gene2tx.tsv >> tx2gene.csv
