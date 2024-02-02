@@ -1,0 +1,13 @@
+*Quantification of files from salmon in R
+library(tximport)
+library(readr)
+
+#creating a file
+files <- file.path("./",list.dirs(recursive = FALSE), "quant.sf")
+names(files) <- gsub("./", "", list.dirs(recursive = FALSE))
+all(file.exists(files))
+
+#open the file with the name of the transcripts
+tx2gene <- read.csv("tx2gene01.csv")
+#import the salmon output files
+txi <-tximport(files, type = "salmon", tx2gene = tx2gene)
